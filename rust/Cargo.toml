@@ -1,0 +1,17 @@
+[workspace]
+members = ["ankifruit-core"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+rust-version = "1.80"
+
+# Keep the static library small; rslib pulls in a very large dependency graph.
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

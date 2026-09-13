@@ -1,0 +1,4 @@
+module AnkiFruitCore {
+    header "ankifruit.h"
+    export *
+}

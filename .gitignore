@@ -1,0 +1,28 @@
+# Rust
+target/
+**/*.rs.bk
+
+# Node
+node_modules/
+web/dist/
+.vite/
+
+# iOS / Xcode
+ios/App/Pods/
+ios/App/build/
+*.xcuserstate
+xcuserdata/
+DerivedData/
+*.ipa
+*.dSYM.zip
+
+# Build artifacts
+out/
+artifacts/
+*.a
+*.xcframework
+
+# Local env
+.env
+.env.local
+.DS_Store

@@ -1,0 +1,91 @@
+# Phase 0 spike: does Anki's rslib cross-compile to Apple mobile targets?
+#
+# This is the question that can kill the project, so it runs on its own, ahead
+# of any app code. Success criterion: a linkable AnkiFruitCore.xcframework
+# containing device and simulator slices.
+name: iOS spike — cross-compile rslib
+
+on:
+  push:
+    paths:
+      - "rust/**"
+      - ".github/workflows/ios-spike.yml"
+  pull_request:
+    paths:
+      - "rust/**"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  # rslib links SQLite and ring via cc; both need a floor deployment target.
+  IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - aarch64-apple-ios      # physical device
+          - aarch64-apple-ios-sim  # Apple Silicon simulator
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # vendor/anki is a submodule, and it has its own ftl/* submodules
+          # holding the translations. Without them rslib's i18n build script
+          # panics in gather.rs.
+          submodules: recursive
+
+      - name: Install protoc
+        run: brew install protobuf
+
+      - name: Install Rust toolchain
+        # Version comes from rust/rust-toolchain.toml, matching upstream Anki.
+        run: rustup target add ${{ matrix.target }}
+        working-directory: rust
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          key: ${{ matrix.target }}
+
+      - name: Build static library
+        working-directory: rust
+        run: cargo build --release --target ${{ matrix.target }} -p ankifruit-core
+
+      - name: Report size
+        working-directory: rust
+        run: ls -lh target/${{ matrix.target }}/release/libankifruit_core.a
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libankifruit_core-${{ matrix.target }}
+          path: rust/target/${{ matrix.target }}/release/libankifruit_core.a
+          if-no-files-found: error
+
+  xcframework:
+    name: Assemble xcframework
+    needs: build
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: slices
+
+      - name: Create xcframework
+        run: |
+          xcodebuild -create-xcframework \
+            -library slices/libankifruit_core-aarch64-apple-ios/libankifruit_core.a \
+            -headers rust/ankifruit-core/include \
+            -library slices/libankifruit_core-aarch64-apple-ios-sim/libankifruit_core.a \
+            -headers rust/ankifruit-core/include \
+            -output AnkiFruitCore.xcframework
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnkiFruitCore.xcframework
+          path: AnkiFruitCore.xcframework
+          if-no-files-found: error
