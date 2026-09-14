@@ -14,9 +14,12 @@ typedef struct AnkiFruitHandle AnkiFruitHandle;
 
 /// Start the Anki backend and its loopback HTTP server.
 /// preferred_langs: comma-separated (e.g. "en,ja"), or NULL for "en".
+/// web_root: directory holding the built web UI, served from the same origin
+///           as the API, or NULL to serve the API only.
 /// port: 0 to let the OS pick.
 /// Returns NULL on failure; if err_out is non-NULL it receives an owned string.
 AnkiFruitHandle *ankifruit_start(const char *preferred_langs,
+                                 const char *web_root,
                                  uint16_t port,
                                  char **err_out);
 

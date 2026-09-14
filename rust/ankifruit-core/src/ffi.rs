@@ -9,6 +9,7 @@
 use std::ffi::c_char;
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::path::PathBuf;
 use std::ptr;
 
 use crate::Instance;
@@ -28,15 +29,18 @@ fn into_c_string(s: impl Into<Vec<u8>>) -> *mut c_char {
 /// Starts the backend and its loopback server.
 ///
 /// `preferred_langs` is a comma-separated list such as `"en,ja"`; pass NULL for
-/// the default. `port` may be 0 to let the OS assign one. On failure returns
-/// NULL and, when `err_out` is non-NULL, stores an owned error string there.
+/// the default. `web_root` is the directory holding the built web UI, served
+/// from the same origin as the API; pass NULL to serve the API only. `port` may
+/// be 0 to let the OS assign one. On failure returns NULL and, when `err_out`
+/// is non-NULL, stores an owned error string there.
 ///
 /// # Safety
-/// `preferred_langs` must be NULL or a valid NUL-terminated C string.
-/// `err_out` must be NULL or a valid, writable `*mut c_char`.
+/// `preferred_langs` and `web_root` must each be NULL or a valid NUL-terminated
+/// C string. `err_out` must be NULL or a valid, writable `*mut c_char`.
 #[no_mangle]
 pub unsafe extern "C" fn ankifruit_start(
     preferred_langs: *const c_char,
+    web_root: *const c_char,
     port: u16,
     err_out: *mut *mut c_char,
 ) -> *mut AnkiFruitHandle {
@@ -59,7 +63,21 @@ pub unsafe extern "C" fn ankifruit_start(
         }
     };
 
-    match Instance::start(&langs, port, false) {
+    let root: Option<PathBuf> = if web_root.is_null() {
+        None
+    } else {
+        match CStr::from_ptr(web_root).to_str() {
+            Ok(s) => Some(PathBuf::from(s)),
+            Err(_) => {
+                if !err_out.is_null() {
+                    *err_out = into_c_string("web_root was not valid UTF-8");
+                }
+                return ptr::null_mut();
+            }
+        }
+    };
+
+    match Instance::start(&langs, port, false, root) {
         Ok(instance) => Box::into_raw(Box::new(AnkiFruitHandle { instance })),
         Err(err) => {
             if !err_out.is_null() {

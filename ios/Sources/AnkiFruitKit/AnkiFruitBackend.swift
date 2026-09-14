@@ -41,11 +41,28 @@ public final class AnkiFruitBackend {
     }
 
     /// Starts the backend. Pass `port: 0` to let the OS choose one.
-    public init(preferredLanguages: [String] = ["en"], port: UInt16 = 0) throws {
+    ///
+    /// `webRoot` is the directory holding the built web UI. Serving it from the
+    /// backend's own origin keeps the webview same-origin, so no CORS setup is
+    /// needed. Pass nil to run the API alone.
+    public init(
+        preferredLanguages: [String] = ["en"],
+        webRoot: URL? = nil,
+        port: UInt16 = 0
+    ) throws {
         var errPtr: UnsafeMutablePointer<CChar>?
         let langs = preferredLanguages.joined(separator: ",")
 
-        guard let handle = langs.withCString({ ankifruit_start($0, port, &errPtr) }) else {
+        let started: OpaquePointer? = langs.withCString { langsPtr in
+            if let webRoot {
+                return webRoot.path.withCString { rootPtr in
+                    ankifruit_start(langsPtr, rootPtr, port, &errPtr)
+                }
+            }
+            return ankifruit_start(langsPtr, nil, port, &errPtr)
+        }
+
+        guard let handle = started else {
             let message: String
             if let errPtr {
                 message = String(cString: errPtr)

@@ -1,0 +1,99 @@
+:root {
+  --bg: #fbfaf8;
+  --surface: #ffffff;
+  --text: #1c1b19;
+  --muted: #6b6862;
+  --line: #e6e2db;
+  --accent: #b3541e;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171614;
+    --surface: #201f1c;
+    --text: #f2efe9;
+    --muted: #a39e94;
+    --line: #322f2a;
+    --accent: #e08b52;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  /* Keep content clear of the notch and home indicator. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.wrap { max-width: 40rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+
+h1 { font-size: 1.5rem; margin: 0 0 0.25rem; letter-spacing: -0.01em; }
+
+.sub { color: var(--muted); font-size: 0.875rem; margin: 0 0 1.5rem; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.card h2 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 0.75rem;
+}
+
+button {
+  font: inherit;
+  font-weight: 500;
+  color: #fff;
+  background: var(--accent);
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  min-height: 2.75rem;
+}
+
+button:disabled { opacity: 0.5; cursor: default; }
+
+ul.decks { list-style: none; margin: 0; padding: 0; }
+
+ul.decks li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+ul.decks li:last-child { border-bottom: 0; }
+
+.id { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.8125rem; }
+
+.error {
+  color: #b3261e;
+  background: #fdecea;
+  border: 1px solid #f5c6c2;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .error { color: #ffb4ab; background: #3b1f1c; border-color: #5c2f2a; }
+}
+
+dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; font-size: 0.875rem; }
+dt { color: var(--muted); }
+dd { margin: 0; font-variant-numeric: tabular-nums; }

@@ -27,3 +27,9 @@ artifacts/
 .env.local
 .DS_Store
 ios/Frameworks/
+
+# Generated from vendor/anki protos - see web/buf.gen.yaml
+web/src/gen/
+
+# Dev harness scratch collection
+devdata/

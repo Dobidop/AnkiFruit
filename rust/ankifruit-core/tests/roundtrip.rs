@@ -16,7 +16,7 @@ struct Client {
 
 impl Client {
     fn start() -> Client {
-        let inst = Instance::start(&["en".to_string()], 0, false).expect("start backend");
+        let inst = Instance::start(&["en".to_string()], 0, false, None).expect("start backend");
         Client {
             inst,
             http: reqwest::blocking::Client::new(),
@@ -141,5 +141,49 @@ fn health_reports_which_anki_is_linked() {
     assert!(
         !body.contains(r#""anki":"""#),
         "anki build hash is empty - run tools/write-buildhash.sh before cargo build: {body}"
+    );
+}
+
+/// The web UI is served from the backend's own origin so the webview needs no
+/// CORS handling. Assets stay unauthenticated on purpose — they are inert and
+/// ship inside the app — which is exactly why the token must never be baked
+/// into them.
+#[test]
+fn serves_the_web_ui_from_the_same_origin() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join("index.html"), "<!doctype html><title>AnkiFruit</title>")
+        .expect("write index");
+    std::fs::write(dir.path().join("app.js"), "export const x = 1;").expect("write asset");
+
+    let inst = Instance::start(
+        &["en".to_string()],
+        0,
+        false,
+        Some(dir.path().to_path_buf()),
+    )
+    .expect("start backend");
+    let http = reqwest::blocking::Client::new();
+    let base = format!("http://127.0.0.1:{}", inst.port);
+
+    let index = http.get(&base).send().expect("GET /");
+    assert!(index.status().is_success(), "index status {}", index.status());
+    assert!(index.text().expect("body").contains("AnkiFruit"));
+
+    let asset = http.get(format!("{base}/app.js")).send().expect("GET asset");
+    assert!(asset.status().is_success());
+
+    // Unknown paths fall back to index.html so client-side routing works.
+    let deep = http.get(format!("{base}/decks/42")).send().expect("GET route");
+    assert!(deep.status().is_success(), "SPA fallback status {}", deep.status());
+
+    // Serving assets must not have opened up the API.
+    let api = http
+        .post(format!("{base}/_anki/getDeckNames"))
+        .send()
+        .expect("POST api");
+    assert_eq!(
+        api.status(),
+        reqwest::StatusCode::UNAUTHORIZED,
+        "static serving must not bypass API auth"
     );
 }

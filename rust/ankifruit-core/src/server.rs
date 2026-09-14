@@ -9,6 +9,7 @@
 // every request must carry the bearer token minted at startup.
 
 use std::net::Ipv4Addr;
+use std::path::PathBuf;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -23,6 +24,8 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::routing::post;
 use axum::Router;
+use tower_http::services::ServeDir;
+use tower_http::services::ServeFile;
 
 use crate::routes;
 
@@ -34,18 +37,37 @@ pub struct AppState {
     pub token: String,
 }
 
-pub fn router(state: Arc<AppState>) -> Router {
-    Router::new()
+/// Builds the router. When `web_root` is set, the built web UI is served from
+/// it so the webview shares an origin with the backend and no CORS is needed.
+///
+/// Static assets are deliberately unauthenticated — they are inert markup that
+/// ships inside the app anyway. The token must therefore never be baked into
+/// them; the shell injects it into the webview instead. Only `/_anki/*`, which
+/// reaches the collection, requires the token.
+pub fn router(state: Arc<AppState>, web_root: Option<PathBuf>) -> Router {
+    let api = Router::new()
         .route("/_anki/healthz", get(healthz))
         .route("/_anki/{method}", post(call_unqualified))
         .route("/_anki/{service}/{method}", post(call_qualified))
-        .with_state(state)
+        .with_state(state);
+
+    match web_root {
+        // Unknown paths fall back to index.html so client-side routing works.
+        Some(root) => {
+            let index = root.join("index.html");
+            api.fallback_service(ServeDir::new(root).fallback(ServeFile::new(index)))
+        }
+        None => api,
+    }
 }
 
 /// Liveness plus provenance: which rslib is actually linked in. Anki's build
 /// hash comes from `vendor/anki/out/buildhash`, which Anki's own Ninja build
 /// writes; `tools/write-buildhash.sh` fills it in for our plain-cargo builds.
-async fn healthz() -> impl IntoResponse {
+async fn healthz(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if let Err(resp) = authorize(&headers, &state) {
+        return resp;
+    }
     let body = format!(
         r#"{{"ok":true,"anki":"{}","ankifruit":"{}"}}"#,
         anki::version::buildhash(),
@@ -56,6 +78,7 @@ async fn healthz() -> impl IntoResponse {
         [(header::CONTENT_TYPE, "application/json")],
         body,
     )
+        .into_response()
 }
 
 /// Constant-time-ish bearer check. Returns `Err` with a ready-made response.

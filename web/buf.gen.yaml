@@ -1,0 +1,11 @@
+# Generates TypeScript message classes from Anki's protos. The service/method
+# indices live in the Rust routing table; here we only need the message types.
+version: v2
+inputs:
+  - directory: ../vendor/anki/proto
+plugins:
+  - local: protoc-gen-es
+    out: src/gen
+    opt:
+      - target=ts
+      - import_extension=js

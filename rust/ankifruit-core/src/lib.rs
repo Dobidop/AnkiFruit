@@ -13,6 +13,7 @@ pub mod routes {
     include!(concat!(env!("OUT_DIR"), "/routes.rs"));
 }
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -31,7 +32,14 @@ pub struct Instance {
 impl Instance {
     /// Starts the backend and serves it on `127.0.0.1:<port>`; pass port 0 to
     /// let the OS choose. `preferred_langs` follows Anki's format, e.g. `en_US`.
-    pub fn start(preferred_langs: &[String], port: u16, server_mode: bool) -> Result<Instance> {
+    /// `web_root`, when set, is the directory holding the built web UI, served
+    /// from the same origin as the API.
+    pub fn start(
+        preferred_langs: &[String],
+        port: u16,
+        server_mode: bool,
+        web_root: Option<PathBuf>,
+    ) -> Result<Instance> {
         let init = anki_proto::backend::BackendInit {
             preferred_langs: preferred_langs.to_vec(),
             locale_folder_path: String::new(),
@@ -70,7 +78,7 @@ impl Instance {
             .context("bind loopback listener")?;
 
         let (tx, rx) = tokio::sync::oneshot::channel::<()>();
-        let router = server::router(state);
+        let router = server::router(state, web_root);
         runtime.spawn(async move {
             let _ = axum::serve(listener, router)
                 .with_graceful_shutdown(async {
@@ -142,7 +150,7 @@ mod tests {
 
     #[test]
     fn server_starts_and_serves_health() {
-        let inst = Instance::start(&["en".to_string()], 0, false).expect("start instance");
+        let inst = Instance::start(&["en".to_string()], 0, false, None).expect("start instance");
         assert!(inst.port > 0);
         assert_eq!(inst.token.len(), 32);
     }
