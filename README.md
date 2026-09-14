@@ -130,8 +130,13 @@ upstream Anki were needed. The cold build takes about 4 minutes on a
 | Bearer token rejects unauthorized callers | ✅ `tests/roundtrip.rs` |
 | rslib cross-compiles to `aarch64-apple-ios` | ✅ CI, both device + sim |
 | `AnkiFruitCore.xcframework` assembles | ✅ CI artifact, 84 MB |
-| Swift shell loads the xcframework | not started |
+| Swift calls the backend on a real simulator | ✅ 5/5 XCTest on iPhone 16 Pro |
+| Capacitor webview drives the backend | not started |
 | `.apkg` import · review UI · AnkiWeb sync | not started |
+
+Phase 1a is done: `AnkiFruitKit` opens a real collection on an iOS simulator
+and reads its decks back over the loopback server. App Transport Security does
+not interfere with loopback HTTP, and unauthenticated callers are rejected.
 
 `tests/roundtrip.rs` opens a real collection on disk and lists its decks
 through the HTTP surface, so everything except the Apple target triple is
