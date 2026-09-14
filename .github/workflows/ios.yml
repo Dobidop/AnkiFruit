@@ -42,6 +42,11 @@ jobs:
           workspaces: rust
           key: ${{ matrix.target }}
 
+      # Must precede cargo: rslib's build script reads this file, and an
+      # absent one silently yields an empty Anki build hash.
+      - name: Record linked Anki version
+        run: tools/write-buildhash.sh
+
       - name: Build static library
         working-directory: rust
         run: cargo build --release --target ${{ matrix.target }} -p ankifruit-core

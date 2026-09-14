@@ -121,3 +121,25 @@ fn the_methods_v1_needs_are_routable() {
         assert!(routes::lookup(name).is_some(), "{name} is not routable");
     }
 }
+
+/// rslib reads its build hash from vendor/anki/out/buildhash, which only
+/// Anki's Ninja build writes. We build with plain cargo, so an empty hash here
+/// means tools/write-buildhash.sh was not run and we cannot tell which Anki is
+/// linked in.
+#[test]
+fn health_reports_which_anki_is_linked() {
+    let client = Client::start();
+    let body = reqwest::blocking::Client::new()
+        .get(format!("http://127.0.0.1:{}/_anki/healthz", client.inst.port))
+        .header("Authorization", format!("Bearer {}", client.inst.token))
+        .send()
+        .expect("healthz")
+        .text()
+        .expect("body");
+
+    assert!(body.contains(r#""ok":true"#), "unexpected body: {body}");
+    assert!(
+        !body.contains(r#""anki":"""#),
+        "anki build hash is empty - run tools/write-buildhash.sh before cargo build: {body}"
+    );
+}

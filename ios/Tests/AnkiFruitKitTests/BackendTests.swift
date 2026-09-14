@@ -48,15 +48,23 @@ final class BackendTests: XCTestCase {
         XCTAssertEqual(backend.token.count, 32, "expected a 32-character token")
     }
 
+    /// Guards against silently linking an unknown Anki: the hash is written by
+    /// tools/write-buildhash.sh, because Anki only populates it via its own
+    /// Ninja build and we build rslib with plain cargo.
     func testLinkedAnkiBuildHashIsExposed() throws {
         let hash = AnkiFruitBackend.ankiBuildHash
-        XCTAssertFalse(hash.isEmpty, "rslib build hash should be readable through the FFI")
+        XCTAssertFalse(
+            hash.isEmpty,
+            "rslib build hash is empty - was tools/write-buildhash.sh run before cargo build?"
+        )
     }
 
-    func testHealthEndpointResponds() async throws {
+    func testHealthEndpointReportsProvenance() async throws {
         let backend = try makeBackend()
         let body = try await backend.health()
-        XCTAssertFalse(body.isEmpty, "healthz should return the rslib build hash")
+        XCTAssertTrue(body.contains("\"ok\":true"), "unexpected healthz body: \(body)")
+        XCTAssertTrue(body.contains("\"anki\":\"\(AnkiFruitBackend.ankiBuildHash)\""),
+                      "healthz should name the linked rslib: \(body)")
     }
 
     func testRequestsWithoutTokenAreRejected() async throws {

@@ -42,8 +42,20 @@ pub fn router(state: Arc<AppState>) -> Router {
         .with_state(state)
 }
 
+/// Liveness plus provenance: which rslib is actually linked in. Anki's build
+/// hash comes from `vendor/anki/out/buildhash`, which Anki's own Ninja build
+/// writes; `tools/write-buildhash.sh` fills it in for our plain-cargo builds.
 async fn healthz() -> impl IntoResponse {
-    (StatusCode::OK, anki::version::buildhash())
+    let body = format!(
+        r#"{{"ok":true,"anki":"{}","ankifruit":"{}"}}"#,
+        anki::version::buildhash(),
+        env!("CARGO_PKG_VERSION"),
+    );
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "application/json")],
+        body,
+    )
 }
 
 /// Constant-time-ish bearer check. Returns `Err` with a ready-made response.

@@ -12,6 +12,8 @@ OUT="$REPO_ROOT/ios/Frameworks/AnkiFruitCore.xcframework"
 # rslib links SQLite and ring through cc; both need a floor deployment target.
 export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-15.0}"
 
+"$REPO_ROOT/tools/write-buildhash.sh"
+
 TARGETS=(aarch64-apple-ios aarch64-apple-ios-sim)
 
 for target in "${TARGETS[@]}"; do
