@@ -1,0 +1,40 @@
+# Generated into an .xcodeproj by XcodeGen at build time, so the pbxproj does
+# not have to be maintained by hand or reviewed in diffs.
+name: AnkiFruit
+options:
+  bundleIdPrefix: net.ankifruit
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+
+packages:
+  AnkiFruitKit:
+    path: ../
+
+targets:
+  AnkiFruit:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      # The built web UI, copied in before the build as a folder reference so
+      # its directory structure survives into the bundle.
+      - path: Resources/web
+        type: folder
+        optional: true
+    dependencies:
+      - package: AnkiFruitKit
+        product: AnkiFruitKit
+    info:
+      path: Resources/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: net.ankifruit.app
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.9"
+        # Sideloaded builds are signed by AltStore/SideStore, not here.
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""

@@ -33,3 +33,8 @@ web/src/gen/
 
 # Dev harness scratch collection
 devdata/
+
+# Web UI staged into the app bundle at build time
+ios/App/Resources/web/
+ios/App/*.xcodeproj/
+build/

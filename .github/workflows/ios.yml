@@ -109,3 +109,76 @@ jobs:
           echo "### Static library size" >> "$GITHUB_STEP_SUMMARY"
           ls -lh slices/*/libankifruit_core.a | awk '{print "- " $NF ": " $5}' >> "$GITHUB_STEP_SUMMARY"
           du -sh ios/Frameworks/AnkiFruitCore.xcframework >> "$GITHUB_STEP_SUMMARY"
+
+  package:
+    name: Unsigned .ipa
+    needs: rust
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: slices
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: brew install xcodegen
+
+      - name: Build web UI
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Stage web UI into the app bundle
+        run: |
+          rm -rf ios/App/Resources/web
+          cp -R web/dist ios/App/Resources/web
+
+      - name: Assemble xcframework
+        run: |
+          mkdir -p ios/Frameworks
+          xcodebuild -create-xcframework             -library slices/libankifruit_core-aarch64-apple-ios/libankifruit_core.a             -headers rust/ankifruit-core/include             -library slices/libankifruit_core-aarch64-apple-ios-sim/libankifruit_core.a             -headers rust/ankifruit-core/include             -output ios/Frameworks/AnkiFruitCore.xcframework
+
+      - name: Generate Xcode project
+        working-directory: ios/App
+        run: xcodegen generate
+
+      - name: Archive
+        run: |
+          xcodebuild archive             -project ios/App/AnkiFruit.xcodeproj             -scheme AnkiFruit             -configuration Release             -destination 'generic/platform=iOS'             -archivePath build/AnkiFruit.xcarchive             CODE_SIGNING_ALLOWED=NO             CODE_SIGNING_REQUIRED=NO             CODE_SIGN_IDENTITY=""
+
+      - name: Package unsigned .ipa
+        run: |
+          # AltStore/SideStore re-sign with the user's own Apple ID at install
+          # time, so an unsigned payload is what they expect.
+          mkdir -p build/Payload
+          cp -R build/AnkiFruit.xcarchive/Products/Applications/AnkiFruit.app build/Payload/
+          (cd build && zip -qry AnkiFruit.ipa Payload)
+          rm -rf build/Payload
+
+      - name: Report real install size
+        run: |
+          app=build/AnkiFruit.xcarchive/Products/Applications/AnkiFruit.app
+          {
+            echo "### Install size"
+            echo ""
+            echo "| | size |"
+            echo "|---|---|"
+            echo "| .ipa (download) | $(ls -lh build/AnkiFruit.ipa | awk '{print $5}') |"
+            echo "| .app bundle (installed) | $(du -sh $app | awk '{print $1}') |"
+            echo "| binary | $(ls -lh $app/AnkiFruit | awk '{print $5}') |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnkiFruit-unsigned-ipa
+          path: build/AnkiFruit.ipa
+          if-no-files-found: error
