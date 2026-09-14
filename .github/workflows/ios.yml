@@ -19,7 +19,7 @@ env:
 
 jobs:
   rust:
-    name: rslib → ${{ matrix.target }}
+    name: rslib to ${{ matrix.target }}
     runs-on: macos-15
     strategy:
       fail-fast: false
@@ -65,6 +65,7 @@ jobs:
 
       - name: Assemble xcframework
         run: |
+          mkdir -p ios/Frameworks
           xcodebuild -create-xcframework \
             -library slices/libankifruit_core-aarch64-apple-ios/libankifruit_core.a \
             -headers rust/ankifruit-core/include \
@@ -75,7 +76,7 @@ jobs:
       - name: Pick a simulator
         id: sim
         run: |
-          # Use whatever iPhone runtime this image ships; pinning a device name
+          # Use whatever iOS runtime this image ships; pinning a device name
           # breaks every time GitHub rotates the image.
           name=$(xcrun simctl list devices available -j \
             | python3 -c "import json,sys;d=json.load(sys.stdin)['devices'];print(next(x['name'] for k,v in d.items() if 'iOS' in k for x in v))")
@@ -85,14 +86,10 @@ jobs:
       - name: Run FFI tests
         working-directory: ios
         run: |
-          set -o pipefail
           xcodebuild test \
             -scheme AnkiFruitKit \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
-            -resultBundlePath TestResults.xcresult \
-            | xcbeautify || xcodebuild test \
-            -scheme AnkiFruitKit \
-            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}"
+            -resultBundlePath TestResults.xcresult
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -101,7 +98,8 @@ jobs:
           path: ios/TestResults.xcresult
           if-no-files-found: ignore
 
-      - name: Report linked size
+      - name: Report sizes
+        if: always()
         run: |
           echo "### Static library size" >> "$GITHUB_STEP_SUMMARY"
           ls -lh slices/*/libankifruit_core.a | awk '{print "- " $NF ": " $5}' >> "$GITHUB_STEP_SUMMARY"
