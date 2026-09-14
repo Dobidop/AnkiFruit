@@ -104,6 +104,18 @@ cd ankifruit/rust
 cargo build --release
 ```
 
+### Running the app without a Mac
+
+The backend serves the web UI, so the whole app runs in a desktop browser:
+
+```bash
+cd web && npm install && npm run build
+cd ../rust && cargo run --bin dev
+```
+
+That prints a loopback URL serving the real Anki backend. UI work needs no
+Apple hardware; only the `.ipa` does.
+
 ### iOS
 
 An `.ipa` can only be produced on macOS. `.github/workflows/ios-spike.yml`
@@ -131,12 +143,30 @@ upstream Anki were needed. The cold build takes about 4 minutes on a
 | rslib cross-compiles to `aarch64-apple-ios` | ✅ CI, both device + sim |
 | `AnkiFruitCore.xcframework` assembles | ✅ CI artifact, 84 MB |
 | Swift calls the backend on a real simulator | ✅ 5/5 XCTest on iPhone 16 Pro |
-| Capacitor webview drives the backend | not started |
+| Web UI drives the backend end to end | ✅ verified in a browser |
+| Unsigned `.ipa` builds for sideloading | ✅ 6.7 MB |
 | `.apkg` import · review UI · AnkiWeb sync | not started |
 
-Phase 1a is done: `AnkiFruitKit` opens a real collection on an iOS simulator
-and reads its decks back over the loopback server. App Transport Security does
-not interfere with loopback HTTP, and unauthenticated callers are rejected.
+Phase 1a: `AnkiFruitKit` opens a real collection on an iOS simulator and reads
+its decks back over the loopback server. App Transport Security does not
+interfere with loopback HTTP, and unauthenticated callers are rejected.
+
+Phase 1b: the React UI encodes protobuf, opens a real collection through rslib
+and lists its decks. A `WKWebView` shell packages it into a sideloadable
+`.ipa`.
+
+### Install size
+
+The device static archive is 158 MB, but that is object files and metadata;
+the linker keeps only what is reachable.
+
+| | size |
+|---|---|
+| `.ipa` (what AltStore re-signs) | 6.7 MB |
+| installed bundle | 18 MB |
+| binary | 17.7 MB |
+
+Small enough that AltStore's weekly re-sign cycle is not a burden.
 
 `tests/roundtrip.rs` opens a real collection on disk and lists its decks
 through the HTTP surface, so everything except the Apple target triple is
@@ -145,10 +175,7 @@ confirmed working locally.
 The pure-TypeScript fallback (`ts-fsrs`, hand-written template renderer and
 sync client) is no longer needed and has been dropped.
 
-Open question carried into Phase 1: the device static archive is 158 MB, which
-is object files and metadata rather than shipped bytes — the linker discards
-unused symbols. Actual `.ipa` size needs measuring, not assuming, and matters
-because AltStore users re-sign weekly over the air.
+That open question about install size is now answered above: 6.7 MB.
 
 ## Licensing
 
