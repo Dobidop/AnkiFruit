@@ -112,11 +112,14 @@ cross-compiles the static library on a macOS runner and assembles
 
 ## Project status
 
-Phase 0 exists to retire the one risk that can invalidate the whole approach:
-nobody upstream maintains an Apple-mobile build of `rslib`. AnkiDroid
-cross-compiles it to `aarch64-linux-android` with plain cargo, so this is a new
-target triple rather than a new class of problem — but it is unproven until CI
-says otherwise.
+Phase 0 existed to retire the one risk that could invalidate the whole
+approach: nobody upstream maintains an Apple-mobile build of `rslib`.
+
+**The spike passed.** `rslib` cross-compiles cleanly to both
+`aarch64-apple-ios` and `aarch64-apple-ios-sim` with plain cargo, and the two
+slices assemble into a usable `AnkiFruitCore.xcframework`. No patches to
+upstream Anki were needed. The cold build takes about 4 minutes on a
+`macos-15` runner.
 
 | | Status |
 |---|---|
@@ -125,7 +128,8 @@ says otherwise.
 | Routing table generates from Anki's descriptor pool | ✅ 236 methods, all unambiguous |
 | Loopback server round-trips a real call into rslib | ✅ `tests/roundtrip.rs` |
 | Bearer token rejects unauthorized callers | ✅ `tests/roundtrip.rs` |
-| rslib cross-compiles to `aarch64-apple-ios` | ⏳ needs a macOS CI run |
+| rslib cross-compiles to `aarch64-apple-ios` | ✅ CI, both device + sim |
+| `AnkiFruitCore.xcframework` assembles | ✅ CI artifact, 84 MB |
 | Swift shell loads the xcframework | not started |
 | `.apkg` import · review UI · AnkiWeb sync | not started |
 
@@ -133,9 +137,13 @@ says otherwise.
 through the HTTP surface, so everything except the Apple target triple is
 confirmed working locally.
 
-If the spike fails, the fallback is a pure-TypeScript client (`ts-fsrs`, native
-SQLite, hand-written template renderer and sync). The UI is written against a
-typed backend interface either way, so that outcome costs time, not work.
+The pure-TypeScript fallback (`ts-fsrs`, hand-written template renderer and
+sync client) is no longer needed and has been dropped.
+
+Open question carried into Phase 1: the device static archive is 158 MB, which
+is object files and metadata rather than shipped bytes — the linker discards
+unused symbols. Actual `.ipa` size needs measuring, not assuming, and matters
+because AltStore users re-sign weekly over the air.
 
 ## Licensing
 
