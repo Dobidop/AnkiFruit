@@ -26,3 +26,4 @@ artifacts/
 .env
 .env.local
 .DS_Store
+ios/Frameworks/

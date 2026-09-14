@@ -1,0 +1,108 @@
+# Builds Anki's rslib for Apple targets, then exercises the Swift -> C -> Rust
+# FFI on a real iOS simulator. Phase 0 proved the cross-compile; the simulator
+# job is what proves the Swift layer actually talks to the backend.
+name: iOS
+
+on:
+  push:
+    paths:
+      - "rust/**"
+      - "ios/**"
+      - "tools/**"
+      - ".github/workflows/ios.yml"
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+
+jobs:
+  rust:
+    name: rslib → ${{ matrix.target }}
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [aarch64-apple-ios, aarch64-apple-ios-sim]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # vendor/anki carries its own ftl/* submodules holding translations;
+          # without them rslib's i18n build script panics in gather.rs.
+          submodules: recursive
+
+      - run: brew install protobuf
+
+      - run: rustup target add ${{ matrix.target }}
+        working-directory: rust
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          key: ${{ matrix.target }}
+
+      - name: Build static library
+        working-directory: rust
+        run: cargo build --release --target ${{ matrix.target }} -p ankifruit-core
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libankifruit_core-${{ matrix.target }}
+          path: rust/target/${{ matrix.target }}/release/libankifruit_core.a
+          if-no-files-found: error
+
+  simulator-tests:
+    name: FFI tests on iOS Simulator
+    needs: rust
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: slices
+
+      - name: Assemble xcframework
+        run: |
+          xcodebuild -create-xcframework \
+            -library slices/libankifruit_core-aarch64-apple-ios/libankifruit_core.a \
+            -headers rust/ankifruit-core/include \
+            -library slices/libankifruit_core-aarch64-apple-ios-sim/libankifruit_core.a \
+            -headers rust/ankifruit-core/include \
+            -output ios/Frameworks/AnkiFruitCore.xcframework
+
+      - name: Pick a simulator
+        id: sim
+        run: |
+          # Use whatever iPhone runtime this image ships; pinning a device name
+          # breaks every time GitHub rotates the image.
+          name=$(xcrun simctl list devices available -j \
+            | python3 -c "import json,sys;d=json.load(sys.stdin)['devices'];print(next(x['name'] for k,v in d.items() if 'iOS' in k for x in v))")
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $name"
+
+      - name: Run FFI tests
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme AnkiFruitKit \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            -resultBundlePath TestResults.xcresult \
+            | xcbeautify || xcodebuild test \
+            -scheme AnkiFruitKit \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: TestResults.xcresult
+          path: ios/TestResults.xcresult
+          if-no-files-found: ignore
+
+      - name: Report linked size
+        run: |
+          echo "### Static library size" >> "$GITHUB_STEP_SUMMARY"
+          ls -lh slices/*/libankifruit_core.a | awk '{print "- " $NF ": " $5}' >> "$GITHUB_STEP_SUMMARY"
+          du -sh ios/Frameworks/AnkiFruitCore.xcframework >> "$GITHUB_STEP_SUMMARY"
